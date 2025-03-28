@@ -14,7 +14,7 @@ class MoneyPlusPlugin(BasePlugin):
         self.data_dir = os.path.abspath("account_data")
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
-        self.host.logger.info(f"账单数据目录: {self.data_dir}")
+        logging.info(f"账单数据目录: {self.data_dir}")
 
     async def initialize(self):
         pass
@@ -45,26 +45,26 @@ class MoneyPlusPlugin(BasePlugin):
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        self.host.logger.info(f"加载账单文件: {os.path.abspath(file_path)}")
+        logging.info(f"加载账单文件: {os.path.abspath(file_path)}")
         
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                self.host.logger.error(f"读取账单文件错误: {str(e)}")
+                logging.error(f"读取账单文件错误: {str(e)}")
                 return {"balance": 0, "transactions": []}
         return {"balance": 0, "transactions": []}
 
     def save_user_data(self, user_id, data):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        self.host.logger.info(f"保存账单文件: {os.path.abspath(file_path)}")
+        logging.info(f"保存账单文件: {os.path.abspath(file_path)}")
         
         try:
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            self.host.logger.error(f"保存账单文件错误: {str(e)}")
+            logging.error(f"保存账单文件错误: {str(e)}")
 
     async def process_transaction(self, ctx: EventContext, msg, user_id):
         try:
@@ -109,7 +109,7 @@ class MoneyPlusPlugin(BasePlugin):
             
         except Exception as e:
             # 计算错误时不返回任何信息，只记录日志
-            self.host.logger.error(f"计算错误: {str(e)}")
+            logging.error(f"计算错误: {str(e)}")
             ctx.prevent_default()
 
     async def clear_account(self, ctx: EventContext, user_id):
