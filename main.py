@@ -4,15 +4,17 @@ import re
 from datetime import datetime
 import os
 import json
+from collections import defaultdict
 
 @register(name="TaylorMoneyPlusPlugin", description="Taylor记账插件", version="0.1", author="taylordang")
 class MoneyPlusPlugin(BasePlugin):
 
     def __init__(self, host: APIHost):
         self.host = host
-        self.data_dir = "account_data"
+        self.data_dir = os.path.abspath("account_data")
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
+        self.host.logger.info(f"账单数据目录: {self.data_dir}")
 
     async def initialize(self):
         pass
@@ -34,28 +36,53 @@ class MoneyPlusPlugin(BasePlugin):
         
         if msg.startswith('+') or msg.startswith('-'):
             await self.process_transaction(ctx, msg, user_id)
-        elif msg == "余额" or msg == "查询余额":
-            await self.check_balance(ctx, user_id)
-        elif msg == "帮助" or msg == "记账帮助":
-            await self.show_help(ctx)
+        elif msg in ["/清账", "/qz"]:
+            await self.clear_account(ctx, user_id)
+        elif msg in ["/查账", "/cz"]:
+            await self.show_transactions(ctx, user_id)
+        elif msg in ["/汇总", "/统计", "/total"]:
+            await self.summarize_by_tag(ctx, user_id)
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
+        self.host.logger.info(f"加载账单文件: {os.path.abspath(file_path)}")
+        
         if os.path.exists(file_path):
-            with open(file_path, 'r') as f:
-                return json.load(f)
+            try:
+                with open(file_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                self.host.logger.error(f"读取账单文件错误: {str(e)}")
+                return {"balance": 0, "transactions": []}
         return {"balance": 0, "transactions": []}
 
     def save_user_data(self, user_id, data):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        with open(file_path, 'w') as f:
-            json.dump(data, f, indent=2)
+        self.host.logger.info(f"保存账单文件: {os.path.abspath(file_path)}")
+        
+        try:
+            with open(file_path, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            self.host.logger.error(f"保存账单文件错误: {str(e)}")
 
     async def process_transaction(self, ctx: EventContext, msg, user_id):
         try:
+            # 检查是否有标签
+            tag = ""
+            if "#" in msg:
+                parts = msg.split("#", 1)
+                msg = parts[0].strip()
+                tag = "#" + parts[1].strip()
+            
+            # 处理表达式
             parts = msg.split(' ', 1)
             expression = parts[0]
-            description = parts[1] if len(parts) > 1 else "无描述"
+            description = parts[1] if len(parts) > 1 else ""
+            
+            # 如果有描述，将其添加到标签前
+            if description:
+                tag = description + " " + tag if tag else description
             
             if expression.startswith('+'):
                 amount = eval(expression[1:])
@@ -69,42 +96,101 @@ class MoneyPlusPlugin(BasePlugin):
             user_data["transactions"].append({
                 "amount": amount,
                 "expression": expression,
-                "description": description,
+                "tag": tag,
                 "timestamp": timestamp
             })
             
             self.save_user_data(user_id, user_data)
             
             amount_str = f"+{amount:.2f}" if amount > 0 else f"{amount:.2f}"
-            reply = f"已记录: {amount_str}元 - {description}\n当前余额: {user_data['balance']:.2f}元"
+            reply = f"已记录: {amount_str}元 {tag}\n当前余额: {user_data['balance']:.2f}元"
+            ctx.add_return("reply", [reply])
+            ctx.prevent_default()
             
         except Exception as e:
+            # 计算错误时不返回任何信息，只记录日志
             self.host.logger.error(f"计算错误: {str(e)}")
-            reply = f"计算错误，请检查表达式格式。正确格式如: +1*3 或 -5/2 [可选描述]"
+            ctx.prevent_default()
+
+    async def clear_account(self, ctx: EventContext, user_id):
+        # 清空账户
+        user_data = {"balance": 0, "transactions": []}
+        self.save_user_data(user_id, user_data)
         
-        ctx.add_return("reply", [reply])
-        ctx.prevent_default()
-
-    async def check_balance(self, ctx: EventContext, user_id):
-        user_data = self.load_user_data(user_id)
-        reply = f"当前余额: {user_data['balance']:.2f}元"
-        ctx.add_return("reply", [reply])
-        ctx.prevent_default()
-
-    async def show_help(self, ctx: EventContext):
-        help_text = (
-            "记账插件使用说明:\n"
-            "1. 记录收入: +金额 [描述]\n"
-            "   例如: +100 工资\n"
-            "   支持简单计算: +50*2 双倍奖金\n"
-            "2. 记录支出: -金额 [描述]\n"
-            "   例如: -50 晚餐\n"
-            "   支持简单计算: -20*3 购物\n"
-            "3. 查询余额: 余额 或 查询余额\n"
-            "4. 显示帮助: 帮助 或 记账帮助"
+        reply = (
+            "清账成功\n"
+            "================\n"
+            "账单金额: 0.00\n"
+            "================"
         )
-        ctx.add_return("reply", [help_text])
+        ctx.add_return("reply", [reply])
+        ctx.prevent_default()
+
+    async def show_transactions(self, ctx: EventContext, user_id):
+        user_data = self.load_user_data(user_id)
+        balance = user_data["balance"]
+        transactions = user_data["transactions"]
+        
+        if not transactions:
+            reply = "账单金额: 0.00"
+            ctx.add_return("reply", [reply])
+            ctx.prevent_default()
+            return
+        
+        reply = f"账单金额: {balance:.2f}\n=====账单明细=====\n"
+        
+        for transaction in transactions:
+            amount = transaction["amount"]
+            tag = transaction["tag"]
+            amount_str = f"+{amount}" if amount > 0 else f"{amount}"
+            reply += f"{amount_str}={amount:.2f} {tag}\n"
+        
+        reply += "================"
+        ctx.add_return("reply", [reply])
+        ctx.prevent_default()
+
+    async def summarize_by_tag(self, ctx: EventContext, user_id):
+        user_data = self.load_user_data(user_id)
+        balance = user_data["balance"]
+        transactions = user_data["transactions"]
+        
+        if not transactions:
+            reply = "账单金额: 0.00"
+            ctx.add_return("reply", [reply])
+            ctx.prevent_default()
+            return
+        
+        # 先显示所有交易
+        reply = f"账单金额: {balance:.2f}\n=====账单明细=====\n"
+        
+        for transaction in transactions:
+            amount = transaction["amount"]
+            tag = transaction["tag"]
+            amount_str = f"+{amount}" if amount > 0 else f"{amount}"
+            reply += f"{amount_str}={amount:.2f} {tag}\n"
+        
+        reply += "================\n"
+        
+        # 按标签分组汇总
+        tag_groups = defaultdict(list)
+        
+        for transaction in transactions:
+            tag = transaction["tag"]
+            if "#" in tag:
+                # 提取#后面的标签
+                tag_name = tag.split("#", 1)[1].strip()
+                tag_groups[tag_name].append(transaction["amount"])
+        
+        # 输出每个标签的汇总
+        for tag_name, amounts in tag_groups.items():
+            total = sum(amounts)
+            amounts_str = "+".join([f"{amount:.2f}" for amount in amounts])
+            reply += f"\n{tag_name}\n{amounts_str}={total:.2f}\n"
+        
+        reply += "\n================"
+        ctx.add_return("reply", [reply])
         ctx.prevent_default()
 
     def __del__(self):
         pass
+
