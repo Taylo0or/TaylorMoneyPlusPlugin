@@ -17,8 +17,18 @@ class MoneyPlusPlugin(BasePlugin):
     async def initialize(self):
         pass
 
-    @handler(PersonNormalMessageReceived, GroupNormalMessageReceived)
-    async def handle_message(self, ctx: EventContext):
+    # 处理个人消息
+    @handler(PersonNormalMessageReceived)
+    async def handle_person_message(self, ctx: EventContext):
+        await self.process_message(ctx)
+
+    # 处理群组消息
+    @handler(GroupNormalMessageReceived)
+    async def handle_group_message(self, ctx: EventContext):
+        await self.process_message(ctx)
+
+    # 统一处理消息的逻辑
+    async def process_message(self, ctx: EventContext):
         msg = ctx.event.text_message.strip()
         user_id = ctx.event.sender_id
         
