@@ -1,5 +1,6 @@
 from pkg.plugin.context import register, handler, llm_func, BasePlugin, APIHost, EventContext
 from pkg.plugin.events import *
+import logging
 import re
 from datetime import datetime
 import os
