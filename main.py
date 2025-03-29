@@ -1,5 +1,6 @@
 from pkg.plugin.context import register, handler, llm_func, BasePlugin, APIHost, EventContext
 from pkg.plugin.events import *
+import logging
 import re
 from datetime import datetime
 import os
@@ -14,7 +15,7 @@ class MoneyPlusPlugin(BasePlugin):
         self.data_dir = os.path.abspath("account_data")
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
-        self.host.logger.info(f"账单数据目录: {self.data_dir}")
+        logging.error(f"账单数据目录: {self.data_dir}")
 
     async def initialize(self):
         pass
@@ -47,7 +48,7 @@ class MoneyPlusPlugin(BasePlugin):
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        self.host.logger.info(f"加载账单文件: {os.path.abspath(file_path)}")
+        logging.error(f"加载账单文件: {os.path.abspath(file_path)}")
         
         if os.path.exists(file_path):
             try:
@@ -60,7 +61,7 @@ class MoneyPlusPlugin(BasePlugin):
 
     def save_user_data(self, user_id, data):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        self.host.logger.info(f"保存账单文件: {os.path.abspath(file_path)}")
+        logging.error(f"保存账单文件: {os.path.abspath(file_path)}")
         
         try:
             with open(file_path, 'w') as f:
