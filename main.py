@@ -6,6 +6,10 @@ from datetime import datetime
 import os
 import json
 from collections import defaultdict
+from decimal import Decimal, getcontext
+
+# 设置Decimal精度
+getcontext().prec = 10
 
 @register(name="TaylorMoneyPlusPlugin", description="Taylor记账插件", version="0.1", author="taylordang")
 class MoneyPlusPlugin(BasePlugin):
@@ -55,7 +59,7 @@ class MoneyPlusPlugin(BasePlugin):
                 with open(file_path, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                self.host.logger.error(f"读取账单文件错误: {str(e)}")
+                logging.error(f"读取账单文件错误: {str(e)}")
                 return {"balance": 0, "transactions": []}
         return {"balance": 0, "transactions": []}
 
@@ -67,7 +71,16 @@ class MoneyPlusPlugin(BasePlugin):
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            self.host.logger.error(f"保存账单文件错误: {str(e)}")
+            logging.error(f"保存账单文件错误: {str(e)}")
+
+    # 使用Decimal计算以避免浮点数精度问题
+    def calculate_expression(self, expression):
+        # 替换表达式中的数字为Decimal
+        expr = re.sub(r'(\d+(\.\d+)?)', r'Decimal("\1")', expression)
+        # 计算结果
+        result = eval(expr)
+        # 转换为float并保留2位小数
+        return float(result.quantize(Decimal('0.01')))
 
     async def process_transaction(self, ctx: EventContext, msg, user_id):
         try:
@@ -87,13 +100,15 @@ class MoneyPlusPlugin(BasePlugin):
             if description:
                 tag = description + " " + tag if tag else description
             
+            # 使用Decimal计算以避免浮点数精度问题
             if expression.startswith('+'):
-                amount = eval(expression[1:])
+                amount = self.calculate_expression(expression[1:])
             else:
-                amount = eval(expression)
+                amount = self.calculate_expression(expression)
             
             user_data = self.load_user_data(user_id)
-            user_data["balance"] += amount
+            # 确保余额也使用2位小数
+            user_data["balance"] = round(user_data["balance"] + amount, 2)
             
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             user_data["transactions"].append({
@@ -112,7 +127,7 @@ class MoneyPlusPlugin(BasePlugin):
             
         except Exception as e:
             # 计算错误时不返回任何信息，只记录日志
-            self.host.logger.error(f"计算错误: {str(e)}")
+            logging.error(f"计算错误: {str(e)}")
             ctx.prevent_default()
 
     async def clear_account(self, ctx: EventContext, user_id):
@@ -176,19 +191,31 @@ class MoneyPlusPlugin(BasePlugin):
         
         # 按标签分组汇总
         tag_groups = defaultdict(list)
+        no_tag_amounts = []
         
         for transaction in transactions:
+            amount = transaction["amount"]
             tag = transaction["tag"]
+            
             if "#" in tag:
                 # 提取#后面的标签
                 tag_name = tag.split("#", 1)[1].strip()
-                tag_groups[tag_name].append(transaction["amount"])
+                tag_groups[tag_name].append(amount)
+            else:
+                # 收集没有标签的交易
+                no_tag_amounts.append(amount)
         
         # 输出每个标签的汇总
         for tag_name, amounts in tag_groups.items():
             total = sum(amounts)
             amounts_str = "+".join([f"{amount:.2f}" for amount in amounts])
             reply += f"\n{tag_name}\n{amounts_str}={total:.2f}\n"
+        
+        # 如果有无标签交易，也显示汇总
+        if no_tag_amounts:
+            total = sum(no_tag_amounts)
+            amounts_str = "+".join([f"{amount:.2f}" for amount in no_tag_amounts])
+            reply += f"\n无标签\n{amounts_str}={total:.2f}\n"
         
         reply += "\n================"
         ctx.add_return("reply", [reply])
@@ -207,7 +234,7 @@ class MoneyPlusPlugin(BasePlugin):
             "3. 查看账单: /查账 或 /cz\n"
             "4. 清空账单: /清账 或 /qz\n"
             "5. 按标签汇总: /汇总 或 /统计 或 /total\n"
-            "6. 显示功能列表: /记账\n"
+            "6. 显示功能列表: /记账 或 /记账功能\n"
             "================\n"
             "注意: #后面的文字会被识别为标签，用于分类统计"
         )
