@@ -1,6 +1,5 @@
 from pkg.plugin.context import register, handler, llm_func, BasePlugin, APIHost, EventContext
 from pkg.plugin.events import *
-import logging
 import re
 from datetime import datetime
 import os
@@ -15,7 +14,7 @@ class MoneyPlusPlugin(BasePlugin):
         self.data_dir = os.path.abspath("account_data")
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
-        logging.info(f"账单数据目录: {self.data_dir}")
+        self.host.logger.info(f"账单数据目录: {self.data_dir}")
 
     async def initialize(self):
         pass
@@ -43,29 +42,31 @@ class MoneyPlusPlugin(BasePlugin):
             await self.show_transactions(ctx, user_id)
         elif msg in ["/汇总", "/统计", "/total"]:
             await self.summarize_by_tag(ctx, user_id)
+        elif msg in ["/记账功能"]:
+            await self.show_features(ctx)
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        logging.info(f"加载账单文件: {os.path.abspath(file_path)}")
+        self.host.logger.info(f"加载账单文件: {os.path.abspath(file_path)}")
         
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'r') as f:
                     return json.load(f)
             except Exception as e:
-                logging.error(f"读取账单文件错误: {str(e)}")
+                self.host.logger.error(f"读取账单文件错误: {str(e)}")
                 return {"balance": 0, "transactions": []}
         return {"balance": 0, "transactions": []}
 
     def save_user_data(self, user_id, data):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
-        logging.info(f"保存账单文件: {os.path.abspath(file_path)}")
+        self.host.logger.info(f"保存账单文件: {os.path.abspath(file_path)}")
         
         try:
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            logging.error(f"保存账单文件错误: {str(e)}")
+            self.host.logger.error(f"保存账单文件错误: {str(e)}")
 
     async def process_transaction(self, ctx: EventContext, msg, user_id):
         try:
@@ -104,13 +105,13 @@ class MoneyPlusPlugin(BasePlugin):
             self.save_user_data(user_id, user_data)
             
             amount_str = f"+{amount:.2f}" if amount > 0 else f"{amount:.2f}"
-            reply = f"已记录: {amount_str}元 {tag}\n当前余额: {user_data['balance']:.2f}元"
+            reply = f"已记录: {amount_str}元 {tag}\n================\n账单金额: {user_data['balance']:.2f}"
             ctx.add_return("reply", [reply])
             ctx.prevent_default()
             
         except Exception as e:
             # 计算错误时不返回任何信息，只记录日志
-            logging.error(f"计算错误: {str(e)}")
+            self.host.logger.error(f"计算错误: {str(e)}")
             ctx.prevent_default()
 
     async def clear_account(self, ctx: EventContext, user_id):
@@ -192,6 +193,25 @@ class MoneyPlusPlugin(BasePlugin):
         ctx.add_return("reply", [reply])
         ctx.prevent_default()
 
+    async def show_features(self, ctx: EventContext):
+        features = (
+            "记账插件功能列表:\n"
+            "================\n"
+            "1. 记录收入: +金额 [描述] [#标签]\n"
+            "   例如: +100 工资 #收入\n"
+            "   支持计算: +50*2 #奖金\n\n"
+            "2. 记录支出: -金额 [描述] [#标签]\n"
+            "   例如: -50 晚餐 #餐饮\n"
+            "   支持计算: -20*3 购物 #日用\n\n"
+            "3. 查看账单: /查账 或 /cz\n"
+            "4. 清空账单: /清账 或 /qz\n"
+            "5. 按标签汇总: /汇总 或 /统计 或 /total\n"
+            "6. 显示功能列表: /记账\n"
+            "================\n"
+            "注意: #后面的文字会被识别为标签，用于分类统计"
+        )
+        ctx.add_return("reply", [features])
+        ctx.prevent_default()
+
     def __del__(self):
         pass
-
