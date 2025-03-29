@@ -208,14 +208,38 @@ class MoneyPlusPlugin(BasePlugin):
         # 输出每个标签的汇总
         for tag_name, amounts in tag_groups.items():
             total = sum(amounts)
-            amounts_str = "+".join([f"{amount:.2f}" for amount in amounts])
-            reply += f"\n{tag_name}\n{amounts_str}={total:.2f}\n"
+            # 修改这里的汇总显示格式，处理负数
+            formula_parts = []
+            for amount in amounts:
+                if amount >= 0:
+                    formula_parts.append(f"+{amount:.2f}")
+                else:
+                    formula_parts.append(f"{amount:.2f}")
+            
+            # 将第一个数字的+号去掉（如果有）
+            if formula_parts and formula_parts[0].startswith('+'):
+                formula_parts[0] = formula_parts[0][1:]
+                
+            formula = "".join(formula_parts)
+            reply += f"\n{tag_name}\n{formula}={total:.2f}\n"
         
         # 如果有无标签交易，也显示汇总
         if no_tag_amounts:
             total = sum(no_tag_amounts)
-            amounts_str = "+".join([f"{amount:.2f}" for amount in no_tag_amounts])
-            reply += f"\n无标签\n{amounts_str}={total:.2f}\n"
+            # 修改这里的汇总显示格式，处理负数
+            formula_parts = []
+            for amount in no_tag_amounts:
+                if amount >= 0:
+                    formula_parts.append(f"+{amount:.2f}")
+                else:
+                    formula_parts.append(f"{amount:.2f}")
+            
+            # 将第一个数字的+号去掉（如果有）
+            if formula_parts and formula_parts[0].startswith('+'):
+                formula_parts[0] = formula_parts[0][1:]
+                
+            formula = "".join(formula_parts)
+            reply += f"\n无标签\n{formula}={total:.2f}\n"
         
         reply += "\n================"
         ctx.add_return("reply", [reply])
