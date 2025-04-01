@@ -68,6 +68,7 @@ class MoneyPlusPlugin(BasePlugin):
 
     # 统一处理消息的逻辑
     async def process_message(self, ctx: EventContext):
+        self.ap.logger.info(f"接收到的上下文信息: {ctx},自己:{self},事件:{EventContext}")
         msg = ctx.event.text_message.strip()
         user_id = ctx.event.sender_id
         
