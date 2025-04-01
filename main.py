@@ -37,6 +37,7 @@ class MoneyPlusPlugin(BasePlugin):
     # 统一处理消息的逻辑
     async def process_message(self, ctx: EventContext):
         msg = ctx.event.text_message.strip()
+        self.ap.logger.info(f"接收到群消息: {msg}")
         user_id = ctx.event.sender_id
         
         if msg.startswith('+') or msg.startswith('-'):
