@@ -62,13 +62,12 @@ class MoneyPlusPlugin(BasePlugin):
             # 恢复原始消息
             ctx.event.text_message = original_msg
         else:
-            # 如果处理后的消息只包含空白字符，则不处理
-            pass
+            # 如果处理后的消息只包含空白字符，阻止默认处理
+            ctx.prevent_default()
 
 
     # 统一处理消息的逻辑
     async def process_message(self, ctx: EventContext):
-        self.ap.logger.info(f"接收到的上下文信息: {ctx},自己:{self},事件:{EventContext}")
         msg = ctx.event.text_message.strip()
         user_id = ctx.event.launcher_id
         
@@ -82,6 +81,14 @@ class MoneyPlusPlugin(BasePlugin):
             await self.summarize_by_tag(ctx, user_id)
         elif msg in ["/记账功能"]:
             await self.show_features(ctx)
+        else:
+            # 检查user_id是否包含"chatroom"字符串
+            if "chatroom" in user_id:
+                # 如果是群聊消息，阻止默认处理
+                ctx.prevent_default()
+            else:
+                # 如果不是群聊消息，不做任何处理
+                pass
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
