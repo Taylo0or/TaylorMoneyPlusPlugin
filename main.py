@@ -32,12 +32,30 @@ class MoneyPlusPlugin(BasePlugin):
     # 处理群组消息
     @handler(GroupNormalMessageReceived)
     async def handle_group_message(self, ctx: EventContext):
-        await self.process_message(ctx)
+        # 获取原始消息
+        msg = ctx.event.text_message
+        # 去除第一行
+        trimmed_msg = self.trim_first_segment(msg)
+        
+        # 检查处理后的消息是否只包含空白字符
+        if trimmed_msg.strip():
+            # 临时替换消息内容
+            original_msg = ctx.event.text_message
+            ctx.event.text_message = trimmed_msg
+            
+            # 处理消息
+            await self.process_message(ctx)
+            
+            # 恢复原始消息
+            ctx.event.text_message = original_msg
+        else:
+            # 如果处理后的消息只包含空白字符，则不处理
+            pass
+
 
     # 统一处理消息的逻辑
     async def process_message(self, ctx: EventContext):
         msg = ctx.event.text_message.strip()
-        msg = self.trim_first_segment(msg)
         user_id = ctx.event.sender_id
         
         if msg.startswith('+') or msg.startswith('-'):
@@ -50,6 +68,16 @@ class MoneyPlusPlugin(BasePlugin):
             await self.summarize_by_tag(ctx, user_id)
         elif msg in ["/记账功能"]:
             await self.show_features(ctx)
+
+    def trim_first_segment(data: str) -> str:
+        # 使用正则匹配首个换行序列
+        match = re.search(r'\r\n?|\n', data)
+        if not match:
+            return ''  # 无换行符时返回空字符串
+        # 获取换行符结束位置
+        end_pos = match.end()
+        # 返回换行符之后的内容
+        return data[end_pos:]
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
@@ -73,18 +101,6 @@ class MoneyPlusPlugin(BasePlugin):
                 json.dump(data, f, indent=2)
         except Exception as e:
             logging.error(f"保存账单文件错误: {str(e)}")
-            
-    def trim_first_segment(data: str) -> str:
-        # 使用正则匹配首个换行序列
-        match = re.search(r'\r\n?|\n', data)
-        if not match:
-            return ''  # 无换行符时返回空字符串
-        # 获取换行符结束位置
-        end_pos = match.end()
-        # 返回换行符之后的内容
-        return data[end_pos:]
-
-
     
     # 使用Decimal计算以避免浮点数精度问题
     def calculate_expression(self, expression):
