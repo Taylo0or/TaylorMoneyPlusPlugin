@@ -37,7 +37,7 @@ class MoneyPlusPlugin(BasePlugin):
     # 统一处理消息的逻辑
     async def process_message(self, ctx: EventContext):
         msg = ctx.event.text_message.strip()
-        msg = trim_first_segment(msg)
+        msg = self.trim_first_segment(msg)
         user_id = ctx.event.sender_id
         
         if msg.startswith('+') or msg.startswith('-'):
