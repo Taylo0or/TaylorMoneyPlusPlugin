@@ -70,7 +70,7 @@ class MoneyPlusPlugin(BasePlugin):
     async def process_message(self, ctx: EventContext):
         self.ap.logger.info(f"接收到的上下文信息: {ctx},自己:{self},事件:{EventContext}")
         msg = ctx.event.text_message.strip()
-        user_id = ctx.event.sender_id
+        user_id = ctx.event.launcher_id
         
         if msg.startswith('+') or msg.startswith('-'):
             await self.process_transaction(ctx, msg, user_id)
