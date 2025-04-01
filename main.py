@@ -40,7 +40,7 @@ class MoneyPlusPlugin(BasePlugin):
         if index == -1:
             return data  #如果没有换行符，返回原始数据
         # 返回除第一行外的所有内容
-        return ''.join(lines[1:])
+        return ''.join(data.splitlines(True)[1:])
 
     # 处理群组消息
     @handler(GroupNormalMessageReceived)
