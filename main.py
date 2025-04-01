@@ -29,6 +29,19 @@ class MoneyPlusPlugin(BasePlugin):
     async def handle_person_message(self, ctx: EventContext):
         await self.process_message(ctx)
 
+    @staticmethod
+    def trim_first_segment(data: str) -> str:
+        """
+        去除消息的第一行，保留后续所有内容（包括换行符和空格）
+        """
+        # 使用splitlines(True)保留换行符
+        lines = data.splitlines(True)
+        if not lines:
+            return ''  # 如果没有内容，返回空字符串
+        
+        # 返回除第一行外的所有内容
+        return ''.join(lines[1:])
+
     # 处理群组消息
     @handler(GroupNormalMessageReceived)
     async def handle_group_message(self, ctx: EventContext):
@@ -68,16 +81,6 @@ class MoneyPlusPlugin(BasePlugin):
             await self.summarize_by_tag(ctx, user_id)
         elif msg in ["/记账功能"]:
             await self.show_features(ctx)
-
-    def trim_first_segment(data: str) -> str:
-        # 使用正则匹配首个换行序列
-        match = re.search(r'\r\n?|\n', data)
-        if not match:
-            return ''  # 无换行符时返回空字符串
-        # 获取换行符结束位置
-        end_pos = match.end()
-        # 返回换行符之后的内容
-        return data[end_pos:]
 
     def load_user_data(self, user_id):
         file_path = os.path.join(self.data_dir, f"{user_id}.txt")
