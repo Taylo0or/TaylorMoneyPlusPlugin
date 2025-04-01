@@ -37,7 +37,7 @@ class MoneyPlusPlugin(BasePlugin):
     # 统一处理消息的逻辑
     async def process_message(self, ctx: EventContext):
         msg = ctx.event.text_message.strip()
-        self.ap.logger.info(f"接收到群消息: {msg}")
+        msg = trim_first_segment(msg)
         user_id = ctx.event.sender_id
         
         if msg.startswith('+') or msg.startswith('-'):
@@ -73,7 +73,19 @@ class MoneyPlusPlugin(BasePlugin):
                 json.dump(data, f, indent=2)
         except Exception as e:
             logging.error(f"保存账单文件错误: {str(e)}")
+            
+    def trim_first_segment(data: str) -> str:
+        # 使用正则匹配首个换行序列
+        match = re.search(r'\r\n?|\n', data)
+        if not match:
+            return ''  # 无换行符时返回空字符串
+        # 获取换行符结束位置
+        end_pos = match.end()
+        # 返回换行符之后的内容
+        return data[end_pos:]
 
+
+    
     # 使用Decimal计算以避免浮点数精度问题
     def calculate_expression(self, expression):
         # 替换表达式中的数字为Decimal
