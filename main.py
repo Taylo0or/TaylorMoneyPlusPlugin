@@ -32,13 +32,13 @@ class MoneyPlusPlugin(BasePlugin):
     @staticmethod
     def trim_first_segment(data: str) -> str:
         """
-        去除消息的第一行，保留后续所有内容（包括换行符和空格）
+        如果消息包含换行符，则移除第一个换行符及其之前的所有内容。
+        如果消息不包含换行符，则返回原始消息。
         """
         # 使用splitlines(True)保留换行符
-        lines = data.splitlines(True)
-        if not lines:
-            return ''  # 如果没有内容，返回空字符串
-        
+        index = data.find('\n')
+        if index == -1:
+            return data  #如果没有换行符，返回原始数据
         # 返回除第一行外的所有内容
         return ''.join(lines[1:])
 
