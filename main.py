@@ -161,7 +161,7 @@ class MoneyPlusPlugin(BasePlugin):
             self.save_user_data(user_id, user_data)
             
             amount_str = f"+{amount:.2f}" if amount > 0 else f"{amount:.2f}"
-            reply = f"已记录: {amount_str}元 {tag}\n================\n账单金额: {user_data['balance']:.2f}"
+            reply = f"已记录: {amount_str} {tag}\n================\n账单金额: {user_data['balance']:.2f}"
             ctx.add_return("reply", [reply])
             ctx.prevent_default()
             
