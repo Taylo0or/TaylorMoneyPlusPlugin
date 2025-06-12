@@ -179,7 +179,6 @@ class MoneyPlusPlugin(BasePlugin):
             "清账成功\n"
             "================\n"
             "账单金额: 0.00\n"
-            "交易笔数: 0\n"  # << 新增：清账后笔数也为0
             "================"
         )
         ctx.add_return("reply", [reply])
@@ -190,28 +189,19 @@ class MoneyPlusPlugin(BasePlugin):
         balance = user_data["balance"]
         transactions = user_data["transactions"]
         
-        # 获取交易笔数
-        transaction_count = len(transactions)
-        
         if not transactions:
-            reply = "账单金额: 0.00\n交易笔数: 0" # << 修改：无交易时也显示笔数
+            reply = "账单金额: 0.00"
             ctx.add_return("reply", [reply])
             ctx.prevent_default()
             return
         
-        # 在头部加入总金额和总笔数
-        reply = (
-            f"账单金额: {balance:.2f}\n"
-            f"交易笔数: {transaction_count}\n" # << 新增：显示总交易笔数
-            "=====账单明细=====\n"
-        )
+        reply = f"账单金额: {balance:.2f}\n=====账单明细=====\n"
         
         for transaction in transactions:
             amount = transaction["amount"]
             tag = transaction["tag"]
-            # 修正显示问题：原始表达式可能比计算后的 amount 更具信息量
-            expression = transaction["expression"]
-            reply += f"{expression}={amount:.2f} {tag}\n"
+            amount_str = f"+{amount}" if amount > 0 else f"{amount}"
+            reply += f"{amount_str}={amount:.2f} {tag}\n"
         
         reply += "================"
         ctx.add_return("reply", [reply])
@@ -222,32 +212,34 @@ class MoneyPlusPlugin(BasePlugin):
         balance = user_data["balance"]
         transactions = user_data["transactions"]
         
-        transaction_count = len(transactions)
-
         if not transactions:
-            reply = "账单金额: 0.00\n交易笔数: 0"
+            reply = "账单金额: 0.00"
             ctx.add_return("reply", [reply])
             ctx.prevent_default()
             return
         
-        # 先显示头部信息
-        reply = (
-            f"账单金额: {balance:.2f}\n"
-            f"交易笔数: {transaction_count}\n" # << 新增：显示总交易笔数
-            "================\n"
-        )
+        # 先显示所有交易
+        reply = f"账单金额: {balance:.2f}\n=====账单明细=====\n"
+        
+        for transaction in transactions:
+            amount = transaction["amount"]
+            tag = transaction["tag"]
+            amount_str = f"+{amount}" if amount > 0 else f"{amount}"
+            reply += f"{amount_str}={amount:.2f} {tag}\n"
+        
+        reply += "================\n"
         
         # 按标签分组汇总
         tag_groups = defaultdict(list)
         no_tag_amounts = []
         
         for transaction in transactions:
-            amount = Decimal(str(transaction["amount"])) # 使用Decimal进行后续计算
+            amount = transaction["amount"]
             tag = transaction["tag"]
             
             if "#" in tag:
                 # 提取#后面的标签
-                tag_name = "#" + tag.split("#", 1)[1].strip()
+                tag_name = tag.split("#", 1)[1].strip()
                 tag_groups[tag_name].append(amount)
             else:
                 # 收集没有标签的交易
@@ -256,16 +248,40 @@ class MoneyPlusPlugin(BasePlugin):
         # 输出每个标签的汇总
         for tag_name, amounts in tag_groups.items():
             total = sum(amounts)
-            count = len(amounts) # 获取当前标签的交易笔数
-            reply += f"{tag_name} (共{count}笔): {total:.2f}\n" # << 修改：增加笔数显示
-
+            # 修改这里的汇总显示格式，处理负数
+            formula_parts = []
+            for amount in amounts:
+                if amount >= 0:
+                    formula_parts.append(f"+{amount:.2f}")
+                else:
+                    formula_parts.append(f"{amount:.2f}")
+            
+            # 将第一个数字的+号去掉（如果有）
+            if formula_parts and formula_parts[0].startswith('+'):
+                formula_parts[0] = formula_parts[0][1:]
+                
+            formula = "".join(formula_parts)
+            reply += f"\n{tag_name}\n{formula}={total:.2f}\n"
+        
         # 如果有无标签交易，也显示汇总
         if no_tag_amounts:
             total = sum(no_tag_amounts)
-            count = len(no_tag_amounts) # 获取无标签交易的笔数
-            reply += f"无标签 (共{count}笔): {total:.2f}\n" # << 修改：增加笔数显示
-
-        reply += "================"
+            # 修改这里的汇总显示格式，处理负数
+            formula_parts = []
+            for amount in no_tag_amounts:
+                if amount >= 0:
+                    formula_parts.append(f"+{amount:.2f}")
+                else:
+                    formula_parts.append(f"{amount:.2f}")
+            
+            # 将第一个数字的+号去掉（如果有）
+            if formula_parts and formula_parts[0].startswith('+'):
+                formula_parts[0] = formula_parts[0][1:]
+                
+            formula = "".join(formula_parts)
+            reply += f"\n无标签\n{formula}={total:.2f}\n"
+        
+        reply += "\n================"
         ctx.add_return("reply", [reply])
         ctx.prevent_default()
 
